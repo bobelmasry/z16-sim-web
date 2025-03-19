@@ -1,10 +1,9 @@
 import { useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
-import { LRLanguage, LanguageSupport, syntaxTree } from "@codemirror/language";
+import { LanguageSupport } from "@codemirror/language";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
-import { EditorView } from "@codemirror/view";
-import { python } from "@codemirror/lang-python";
+import { StreamLanguage } from "@codemirror/language";
 import { oneDark } from "@codemirror/theme-one-dark";
 
 export default function Home() {
@@ -12,20 +11,45 @@ export default function Home() {
   const [registers, setRegisters] = useState(Array(8).fill(0));
   const [displayFormat, setDisplayFormat] = useState("decimal");
 
-  const z16Language = LRLanguage.define({
-    parser: {
-      parse: (input) => syntaxTree(input), // Placeholder (not full parsing)
-    },
-  });
+  // Define Z16 Assembly Syntax Highlighting
+const z16Language = StreamLanguage.define({
+  startState: () => ({}),
+  token: (stream) => {
+    if (stream.eatSpace()) return null;
 
-  const z16Highlighting = HighlightStyle.define([
-    { tag: t.keyword, color: "#ff9800" }, // Instructions (e.g., ADD, SUB, JAL)
-    { tag: t.variableName, color: "#2196F3" }, // Registers (x0-x7)
-    { tag: t.number, color: "#4CAF50" }, // Immediate values
-    { tag: t.comment, color: "#9E9E9E", fontStyle: "italic" }, // Comments
-  ]);
+    // Highlight Comments (Starts with ';' or '#')
+    if (stream.match(/(;|#).*/)) {
+      return "comment";
+    }
 
-  const z16Support = new LanguageSupport(z16Language, [syntaxHighlighting(z16Highlighting)]);
+    // Highlight Instructions (Z16 opcodes)
+    if (stream.match(/\b(ADD|SUB|JALR|JR|ADDI|SLTI|XORI|ANDI|ORI|LI|BEQ|BNE|BZ|BNZ|BLT|BGE|BLTU|BGEU|LUI|AUIPC|J|JAL|ECALL|LB|LW|LBU)\b/)) {
+      return "keyword";
+    }
+
+    // Highlight Registers (x0 - x7)
+    if (stream.match(/\bx[0-7]\b/)) {
+      return "variableName";
+    }
+
+    // Highlight Immediate Values (Hex, Binary, Decimal)
+    if (stream.match(/\b(0x[0-9A-Fa-f]+|0b[01]+|\d+)\b/)) {
+      return "number";
+    }
+
+    stream.next();
+    return null;
+  },
+});
+
+  const z16Highlighting = syntaxHighlighting(
+    HighlightStyle.define([
+      { tag: t.keyword, color: "#ff9800", fontWeight: "bold" }, // Instructions (Orange)
+      { tag: t.variableName, color: "#2196F3", fontWeight: "bold" }, // Registers (Blue)
+      { tag: t.number, color: "#4CAF50" }, // Immediate values (Green)
+      { tag: t.comment, color: "#9E9E9E", fontStyle: "italic" }, // Comments (Gray Italic)
+    ])
+  );
 
   // Function to format values based on the selected display format
   const formatValue = (value: number) => {
@@ -50,7 +74,7 @@ export default function Home() {
         <CodeMirror
           value={assemblyCode}
           onChange={(value) => setAssemblyCode(value)}
-          extensions={[z16Support]} // Temporary; you can replace this with custom Z16 syntax rules
+          extensions={[z16Language, z16Highlighting]} // Temporary; you can replace this with custom Z16 syntax rules
           theme={oneDark}
           className="w-full h-96 p-2 border rounded-lg shadow-sm bg-gray-200"
         />
