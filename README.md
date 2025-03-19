@@ -1,6 +1,6 @@
 # Z16 Assembly Simulator
 
-A web-based simulator for executing Z16 assembly instructions (see [https://github.com/shalan/z16](z16 ISA)), built with Next.js and TypeScript. This project features a syntax-highlighted editor, register display, and step-by-step execution of Z16 instructions.
+A web-based simulator for executing Z16 assembly instructions, based on Prof. Mohamed Shalan's [Z16 ISA](https://github.com/shalan/z16). Built with Next.js and TypeScript, this project features a syntax-highlighted editor, register display, and step-by-step execution of Z16 instructions.
 
 ## Features
 - **Syntax Highlighting**: Custom highlighting for Z16 assembly code using CodeMirror.
