@@ -1,113 +1,98 @@
-import Image from "next/image";
-import { Geist, Geist_Mono } from "next/font/google";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { useState } from "react";
+import CodeMirror from "@uiw/react-codemirror";
+import { LRLanguage, LanguageSupport, syntaxTree } from "@codemirror/language";
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { tags as t } from "@lezer/highlight";
+import { EditorView } from "@codemirror/view";
+import { python } from "@codemirror/lang-python";
+import { oneDark } from "@codemirror/theme-one-dark";
 
 export default function Home() {
+  const [assemblyCode, setAssemblyCode] = useState("ADD x0, x1 # Continue from here");
+  const [registers, setRegisters] = useState(Array(8).fill(0));
+  const [displayFormat, setDisplayFormat] = useState("decimal");
+
+  const z16Language = LRLanguage.define({
+    parser: {
+      parse: (input) => syntaxTree(input), // Placeholder (not full parsing)
+    },
+  });
+
+  const z16Highlighting = HighlightStyle.define([
+    { tag: t.keyword, color: "#ff9800" }, // Instructions (e.g., ADD, SUB, JAL)
+    { tag: t.variableName, color: "#2196F3" }, // Registers (x0-x7)
+    { tag: t.number, color: "#4CAF50" }, // Immediate values
+    { tag: t.comment, color: "#9E9E9E", fontStyle: "italic" }, // Comments
+  ]);
+
+  const z16Support = new LanguageSupport(z16Language, [syntaxHighlighting(z16Highlighting)]);
+
+  // Function to format values based on the selected display format
+  const formatValue = (value: number) => {
+    switch (displayFormat) {
+      case "binary":
+        return "0b" + value.toString(2).padStart(8, "0"); // 8-bit binary
+      case "hex":
+        return "0x" + value.toString(16).toUpperCase(); // Uppercase hex
+      default:
+        return value.toString(); // Decimal
+    }
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
+          <div className="flex min-h-screen text-black items-start justify-center p-10 bg-gray-800">
+        {/* Left: Assembly Code Input */}
+      <div className="w-1/2 p-4">
+        <h2 className="text-xl text-gray-200 font-bold mb-2">Z16 Assembly Simulator</h2>
+
+        <div className="w-full p-2 border rounded-lg shadow-sm focus:outline-none bg-gray-200 overflow-y-auto">
+        {/* CodeMirror Editor */}
+        <CodeMirror
+          value={assemblyCode}
+          onChange={(value) => setAssemblyCode(value)}
+          extensions={[z16Support]} // Temporary; you can replace this with custom Z16 syntax rules
+          theme={oneDark}
+          className="w-full h-96 p-2 border rounded-lg shadow-sm bg-gray-200"
         />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              pages/index.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        </div>
+
+      {/* Right: Register Table */}
+      <div className="w-1/3 p-4 bg-gray-200 shadow-lg rounded-lg">
+        <h2 className="text-xl font-bold mb-2">Registers</h2>
+
+        {/* Dropdown to select display format */}
+        <div className="mb-2">
+          <label className="text-sm font-semibold">Display Format:</label>
+          <select
+            className="ml-2 p-1 border rounded-lg bg-white"
+            value={displayFormat}
+            onChange={(e) => setDisplayFormat(e.target.value)}
+          >
+            <option value="decimal">Decimal</option>
+            <option value="binary">Binary</option>
+            <option value="hex">Hexadecimal</option>
+          </select>
+        </div>
+
+        {/* Register Table */}
+        <table className="w-full border-collapse border border-gray-300">
+          <thead>
+            <tr className="bg-white">
+              <th className="border p-2">Register</th>
+              <th className="border p-2">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {registers.map((value, index) => (
+              <tr key={index} className="text-center bg-white">
+                <td className="border p-2">{`x${index}`}</td>
+                <td className="border p-2">{formatValue(value)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
