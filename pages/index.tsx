@@ -65,13 +65,14 @@ const z16Language = StreamLanguage.define({
 
   const executeInstructions = (step = false) => {
     if (!step) {
-      setPC(0);
-      setRegisters(Array(8).fill(0));
+        setPC(0);
+        setRegisters(Array(8).fill(0));
     }
+
     const lines = assemblyCode
-      .split("\n")
-      .map((line) => line.trim())
-      .filter((line) => line && !line.startsWith("#"));
+        .split("\n")
+        .map((line) => line.split("#")[0].trim()) // Remove comments
+        .filter((line) => line); // Ignore empty lines
 
     if (PC >= lines.length) return;
 
@@ -80,45 +81,97 @@ const z16Language = StreamLanguage.define({
     let newRegisters = [...registers];
     let newPC = PC;
 
-    const instructionRegex = /^(\w+)\s+x(\d),\s*x?(\d*)?,?\s*(-?\d*)?/;
-    const match = lines[newPC].match(instructionRegex);
-    if (!match) {
-      console.error(`Invalid instruction at line ${newPC}: ${lines[newPC]}`);
-      return;
-    }
+    // Manual parsing without regex
+    const parseInstruction = (line: string) => {
+      let parts = [];
+      let currentPart = "";
+      let insideWhitespace = false;
 
-    const [, instr, rd, rs, imm] = match;
-    const regD = parseInt(rd);
-    const regS = parseInt(rs);
-    const immediate = parseInt(imm);
+      for (let char of line) {
+          if (char === " " || char === ",") {
+              if (!insideWhitespace) {
+                  parts.push(currentPart);
+                  currentPart = "";
+                  insideWhitespace = true;
+              }
+          } else {
+              currentPart += char;
+              insideWhitespace = false;
+          }
+      }
 
-    console.log(`Instruction: ${instr}, rd: x${regD}, rs: x${regS}, imm: ${immediate}`);
+      if (currentPart) parts.push(currentPart); // Add last part if any
+      return parts;
+  };
 
-    switch (instr.toUpperCase()) {
-      case "ADD":
-        newRegisters[regD] = newRegisters[regD] + newRegisters[regS];
-        break;
-      case "SUB":
-        newRegisters[regD] = newRegisters[regD] - newRegisters[regS];
-        break;
-      case "ADDI":
-        newRegisters[regD] = newRegisters[regD] + immediate;
-        break;
-      case "BEQ":
-        if (newRegisters[regD] === newRegisters[regS]) newPC += immediate;
-        break;
-      case "J":
-        newPC += immediate;
-        break;
-      case "JAL":
-        newRegisters[7] = newPC + 1;
-        newPC += immediate;
-        break;
-      case "ECALL":
-        console.log(`ECALL at PC ${newPC}: x${regD} = ${newRegisters[regD]}`);
-        break;
-      default:
-        console.error(`Unknown instruction: ${instr}`);
+  const parts = parseInstruction(lines[newPC]);
+  console.log(parts);
+  if (parts.length === 0) return;
+
+    const instr = parts[0].toUpperCase();
+    let rd : number | null = null;
+    let rs : number | null = null;
+    let imm : number | null = null;
+
+    // Instruction execution logic
+    switch (instr) {
+        case "ADD":
+        case "SUB":
+            rd = parseInt(parts[1]);
+            rs = parseInt(parts[2]);
+            if (rd === null || rs === null) {
+                console.error(`${instr} requires two registers`);
+                return;
+            }
+            newRegisters[rd] = instr === "ADD" ? newRegisters[rd] + newRegisters[rs] : newRegisters[rd] - newRegisters[rs];
+            break;
+        case "ADDI":
+            rd = parseInt(parts[1]);
+            imm = parseInt(parts[2]);
+            if (rd === null || imm === null) {
+                console.error("ADDI requires a register and an immediate value");
+                return;
+            }
+            newRegisters[rd] += imm;
+            break;
+        case "BEQ":
+            rd = parseInt(parts[1]);
+            rs = parseInt(parts[2]);
+            imm = parseInt(parts[3]);
+            if (rd === null || rs === null || imm === null) {
+                console.error("BEQ requires two registers and an immediate offset");
+                return;
+            }
+            if (newRegisters[rd] === newRegisters[rs]) newPC += imm;
+            break;
+        case "J":
+            imm = parseInt(parts[1]);
+            if (imm === null) {
+                console.error("J requires an immediate offset");
+                return;
+            }
+            newPC += imm;
+            break;
+        case "JAL":
+            imm = parseInt(parts[1]);
+            if (imm === null) {
+                console.error("JAL requires an immediate offset");
+                return;
+            }
+            newRegisters[7] = newPC + 1;
+            newPC += imm;
+            break;
+        case "ECALL":
+            rd = parseInt(parts[1]);
+            if (rd !== null) {
+              console.log(`ECALL at PC ${newPC}: x${rd} = ${newRegisters[rd]}`);
+            } else {
+              console.error("ECALL requires a valid register index");
+            }
+            break;
+        default:
+            console.error(`Unknown instruction: ${instr}`);
+            return;
     }
 
     if (!step) newPC++;
@@ -126,7 +179,8 @@ const z16Language = StreamLanguage.define({
     setPC(newPC);
 
     console.log("Registers:", newRegisters);
-  };
+};
+
 
   return (
           <div className="flex min-h-screen text-black items-start justify-center p-10 lg:p-40 bg-gray-800">
@@ -185,6 +239,10 @@ const z16Language = StreamLanguage.define({
             </tr>
           </thead>
           <tbody>
+          <tr className="text-center bg-orange-200">
+              <td className="border p-2">PC</td>
+              <td className="border p-2">{formatValue(PC)}</td>
+            </tr>
             {registers.map((value, index) => (
               <tr key={index} className="text-center bg-gray-100">
                 <td className="border p-2">{`x${index}`}</td>
