@@ -88,15 +88,15 @@ const z16Language = StreamLanguage.define({
     class {
       decorations: RangeSet<Decoration>;
   
-      constructor(view) {
+      constructor(view: any) {
         this.decorations = this.getDecorations(view);
       }
   
-      update(update) {
+      update(update: { view: any; }) {
         this.decorations = this.getDecorations(update.view);
       }
   
-      getDecorations(view) {
+      getDecorations(view: { state: { doc: { line: (arg0: number) => any; }; }; }) {
         const lines = assemblyCode
           .split("\n")
           .map((line, index) => ({ text: line.split("#")[0].trim(), index }))
