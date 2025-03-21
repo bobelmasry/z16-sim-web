@@ -4,9 +4,42 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 import { StreamLanguage } from "@codemirror/language";
 import { oneDark } from "@codemirror/theme-one-dark";
+import { EditorView, Decoration, ViewPlugin } from "@codemirror/view";
+import { RangeSet } from "@codemirror/state";
 
 export default function Home() {
-  const [assemblyCode, setAssemblyCode] = useState("ADDI x0, x1, 10 # Continue from here");
+
+  const initialAssemblyCode = `# Initialize registers
+    LI 0x0, 5        # Load immediate 5 into 0x0
+    LI 0x1, 10       # Load immediate 10 into 0x1
+
+    # Arithmetic operations (two-register format)
+    ADD 0x2, 0x0     # 0x2 = 0x2 + 0x0 (assumes 0x2 initially 0)
+    ADD 0x2, 0x1     # 0x2 = 0x2 + 0x1 (5 + 10 = 15)
+
+    SUB 0x3, 0x2     # 0x3 = 0x3 - 0x2 (assumes 0x3 initially 0)
+    ADD 0x3, 0x1     # 0x3 = 0x3 + 0x1 (0 - 15 + 10 = -5)
+
+    # Branching
+    LI 0x4, 2        # Load immediate 2 into 0x4
+    BEQ 0x0, 0x4, 2  # If 0x0 == 0x4, jump 2 instructions ahead
+    LI 0x5, 100      # (Skipped if BEQ is taken)
+    J 1              # Unconditional jump (skips the next instruction)
+    LI 0x5, 200      # This is executed if BEQ was taken
+
+    # Function call simulation
+    LI 0x6, 4        # Load immediate 4 into 0x6
+    JAL 3            # Jump and link to the instruction 3 steps ahead
+    LI 0x7, 50       # This instruction is skipped due to the jump
+
+    # Function return (simulated)
+    LI 0x6, 99       # Function body
+    JALR 0x7         # Return to saved address in 0x7
+
+    # System call
+    ECALL 0x2        # Print value in 0x2`;
+
+  const [assemblyCode, setAssemblyCode] = useState(initialAssemblyCode);
   const [registers, setRegisters] = useState(Array(8).fill(0));
   const [displayFormat, setDisplayFormat] = useState("decimal");
   const [PC, setPC] = useState(0);
@@ -28,7 +61,7 @@ const z16Language = StreamLanguage.define({
     }
 
     // Highlight Registers (x0 - x7)
-    if (stream.match(/\bx[0-7]\b/)) {
+    if (stream.match(/\b0x[0-7]\b/)) {
       return "variableName";
     }
 
@@ -50,6 +83,42 @@ const z16Language = StreamLanguage.define({
       { tag: t.comment, color: "#9E9E9E", fontStyle: "italic" }, // Comments (Gray Italic)
     ])
   );
+  
+  const highlightCurrentInstruction = ViewPlugin.fromClass(
+    class {
+      decorations: RangeSet<Decoration>;
+  
+      constructor(view) {
+        this.decorations = this.getDecorations(view);
+      }
+  
+      update(update) {
+        this.decorations = this.getDecorations(update.view);
+      }
+  
+      getDecorations(view) {
+        const lines = assemblyCode
+          .split("\n")
+          .map((line, index) => ({ text: line.split("#")[0].trim(), index }))
+          .filter((line) => line.text !== ""); // Remove empty/comment-only lines
+  
+        if (PC >= lines.length) return Decoration.none;
+  
+        // Find the actual instruction line in the document
+        let instructionLine = view.state.doc.line(lines[PC].index + 1);
+  
+        return Decoration.set([
+          Decoration.line({
+            attributes: { style: "background-color: rgba(255, 255, 0, 0.3);" },
+          }).range(instructionLine.from),
+        ]);
+      }
+    },
+    {
+      decorations: (v) => v.decorations,
+    }
+  );
+  
 
   // Function to format values based on the selected display format
   const formatValue = (value: number) => {
@@ -109,9 +178,9 @@ const z16Language = StreamLanguage.define({
   if (parts.length === 0) return;
 
     const instr = parts[0].toUpperCase();
-    let rd : number | null = null;
-    let rs : number | null = null;
-    let imm : number | null = null;
+    let rd : number;
+    let rs : number;
+    let imm : number;
 
     // Instruction execution logic
     switch (instr) {
@@ -133,6 +202,15 @@ const z16Language = StreamLanguage.define({
                 return;
             }
             newRegisters[rd] += imm;
+            break;
+        case "LI":
+            rd = parseInt(parts[1]);
+            imm = parseInt(parts[2]);
+            if (rd === null || imm === null) {
+                console.error("LI requires a register and an immediate value");
+                return;
+            }
+            newRegisters[rd] = imm;
             break;
         case "BEQ":
             rd = parseInt(parts[1]);
@@ -181,9 +259,14 @@ const z16Language = StreamLanguage.define({
     console.log("Registers:", newRegisters);
 };
 
+  const Reset = () => {
+    setPC(0);
+    setRegisters(Array(8).fill(0));
+  };
+
 
   return (
-          <div className="flex min-h-screen text-black items-start justify-center p-10 lg:p-40 bg-gray-800">
+          <div className="flex min-h-screen text-black items-start justify-center pt-12 lg:pt-40 bg-gray-800">
         {/* Left: Assembly Code Input */}
       <div className="w-1/2 p-4">
         <h2 className="text-xl text-gray-200 font-bold mb-2">Z16 Assembly Simulator</h2>
@@ -193,27 +276,16 @@ const z16Language = StreamLanguage.define({
         <CodeMirror
           value={assemblyCode}
           onChange={(value) => setAssemblyCode(value)}
-          extensions={[z16Language, z16Highlighting]}
+          extensions={[z16Language, z16Highlighting, highlightCurrentInstruction]}
           theme={oneDark}
-          className="w-full h-96 p-2 border rounded-lg shadow-sm bg-gray-200"
+          className="w-full h-auto p-2 border rounded-lg shadow-sm bg-gray-200"
           style={{ backgroundColor: "#2a313d" }} // Ensures full gray background
         />
-        </div>
-        {/* Buttons for Execution */}
-        <div className="mt-4 flex space-x-2">
-          <button onClick={() => executeInstructions(true)}
-          className="px-4 py-2 font-semibold bg-blue-500 text-gray-200 rounded-lg shadow hover:bg-blue-600">
-            Step
-          </button>
-          <button onClick={() => executeInstructions(false)}
-          className="px-4 font-semibold py-2 bg-green-500 text-gray-200 rounded-lg shadow hover:bg-green-600">
-            Run
-          </button>
         </div>
         </div>
 
       {/* Right: Register Table */}
-      <div className="w-1/3 p-4 bg-gray-200 shadow-lg rounded-lg">
+      <div className="w-1/3 p-4 bg-gray-200 mt-14 shadow-lg rounded-lg">
         <h2 className="text-xl font-bold mb-2">Registers</h2>
 
         {/* Dropdown to select display format */}
@@ -245,12 +317,23 @@ const z16Language = StreamLanguage.define({
             </tr>
             {registers.map((value, index) => (
               <tr key={index} className="text-center bg-gray-100">
-                <td className="border p-2">{`x${index}`}</td>
+                <td className="border p-2">{`0x${index}`}</td>
                 <td className="border p-2">{formatValue(value)}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        {/* Buttons for Execution */}
+        <div className="mt-4 flex space-x-2">
+          <button onClick={() => executeInstructions(false)}
+          className="px-4 font-semibold py-2 bg-green-500 text-gray-200 rounded-lg shadow hover:bg-green-600">
+            Step
+          </button>
+          <button onClick={() => Reset()}
+          className="px-4 font-semibold py-2 bg-blue-500 text-gray-200 rounded-lg shadow hover:bg-blue-600">
+            Reset
+          </button>
+        </div>
       </div>
     </div>
   );
