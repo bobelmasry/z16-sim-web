@@ -4,7 +4,7 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 import { StreamLanguage } from "@codemirror/language";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { EditorView, Decoration, ViewPlugin } from "@codemirror/view";
+import { Decoration, ViewPlugin } from "@codemirror/view";
 import { RangeSet } from "@codemirror/state";
 
 export default function Home() {
@@ -186,42 +186,186 @@ const z16Language = StreamLanguage.define({
     switch (instr) {
         case "ADD":
         case "SUB":
+        case "SLT":
+        case "SLTU":
+        case "SLL":
+        case "SRL":
+        case "SRA":
+        case "OR":
+        case "AND":
+        case "XOR":
             rd = parseInt(parts[1]);
             rs = parseInt(parts[2]);
-            if (rd === null || rs === null) {
-                console.error(`${instr} requires two registers`);
+            if (isNaN(rd) || isNaN(rs)) {
+                console.error(`${instr} requires two valid registers`);
                 return;
             }
-            newRegisters[rd] = instr === "ADD" ? newRegisters[rd] + newRegisters[rs] : newRegisters[rd] - newRegisters[rs];
+            switch (instr) {
+                case "ADD":
+                    newRegisters[rd] += newRegisters[rs];
+                    break;
+                case "SUB":
+                    newRegisters[rd] -= newRegisters[rs];
+                    break;
+                case "SLT":
+                    newRegisters[rd] = newRegisters[rd] < newRegisters[rs] ? 1 : 0;
+                    break;
+                case "SLTU":
+                    newRegisters[rd] = (newRegisters[rd] >>> 0) < (newRegisters[rs] >>> 0) ? 1 : 0;
+                    break;
+                case "SLL":
+                    newRegisters[rd] = newRegisters[rd] << newRegisters[rs];
+                    break;
+                case "SRL":
+                    newRegisters[rd] = newRegisters[rd] >>> newRegisters[rs];
+                    break;
+                case "SRA":
+                    newRegisters[rd] = newRegisters[rd] >> newRegisters[rs];
+                    break;
+                case "OR":
+                    newRegisters[rd] |= newRegisters[rs];
+                    break;
+                case "AND":
+                    newRegisters[rd] &= newRegisters[rs];
+                    break;
+                case "XOR":
+                    newRegisters[rd] ^= newRegisters[rs];
+                    break;
+            }
             break;
+        
+        case "MV": // Move instruction (MV rd, rs → rd = rs)
+            rd = parseInt(parts[1]);
+            rs = parseInt(parts[2]);
+            if (isNaN(rd) || isNaN(rs)) {
+                console.error(`MV requires two valid registers`);
+                return;
+            }
+            newRegisters[rd] = newRegisters[rs];
+            break;
+        
         case "ADDI":
+        case "SLTI":
+        case "SLTUI":
+        case "SLLI":
+        case "SRLI":
+        case "SRAI":
+        case "ORI":
+        case "ANDI":
+        case "XORI":
             rd = parseInt(parts[1]);
             imm = parseInt(parts[2]);
-            if (rd === null || imm === null) {
-                console.error("ADDI requires a register and an immediate value");
+            if (isNaN(rd) || isNaN(imm)) {
+                console.error(`${instr} requires a valid register and an immediate value`);
                 return;
             }
-            newRegisters[rd] += imm;
+            switch (instr) {
+                case "ADDI":
+                    newRegisters[rd] += imm;
+                    break;
+                case "SLTI":
+                    newRegisters[rd] = newRegisters[rd] < imm ? 1 : 0;
+                    break;
+                case "SLTUI":
+                    newRegisters[rd] = (newRegisters[rd] >>> 0) < (imm >>> 0) ? 1 : 0;
+                    break;
+                case "SLLI":
+                    newRegisters[rd] = newRegisters[rd] << imm;
+                    break;
+                case "SRLI":
+                    newRegisters[rd] = newRegisters[rd] >>> imm;
+                    break;
+                case "SRAI":
+                    newRegisters[rd] = newRegisters[rd] >> imm;
+                    break;
+                case "ORI":
+                    newRegisters[rd] |= imm;
+                    break;
+                case "ANDI":
+                    newRegisters[rd] &= imm;
+                    break;
+                case "XORI":
+                    newRegisters[rd] ^= imm;
+                    break;
+            }
             break;
-        case "LI":
+        
+        case "LI": // Load immediate
             rd = parseInt(parts[1]);
             imm = parseInt(parts[2]);
-            if (rd === null || imm === null) {
-                console.error("LI requires a register and an immediate value");
+            if (isNaN(rd) || isNaN(imm)) {
+                console.error("LI requires a valid register and an immediate value");
                 return;
             }
             newRegisters[rd] = imm;
             break;
+              
         case "BEQ":
-            rd = parseInt(parts[1]);
-            rs = parseInt(parts[2]);
-            imm = parseInt(parts[3]);
-            if (rd === null || rs === null || imm === null) {
-                console.error("BEQ requires two registers and an immediate offset");
+        case "BNE":
+        case "BZ":
+        case "BNZ":
+        case "BLT":
+        case "BGE":
+        case "BLTU":
+        case "BGEU":
+            rd = parseInt(parts[1]); // First operand (or register for BZ/BNZ)
+            rs = instr === "BZ" || instr === "BNZ" ? 0 : parseInt(parts[2]); // Second operand (default to 0 for BZ/BNZ)
+            imm = parseInt(parts[instr === "BZ" || instr === "BNZ" ? 2 : 3]); // Immediate offset
+        
+            if (isNaN(rd) || isNaN(imm) || (rs !== null && isNaN(rs))) {
+                console.error(`${instr} requires valid registers and an immediate offset`);
                 return;
             }
-            if (newRegisters[rd] === newRegisters[rs]) newPC += imm;
+        
+            switch (instr) {
+                case "BEQ":
+                    if (newRegisters[rd] === newRegisters[rs]) newPC += imm;
+                    break;
+                case "BNE":
+                    if (newRegisters[rd] !== newRegisters[rs]) newPC += imm;
+                    break;
+                case "BZ":
+                    if (newRegisters[rd] === 0) newPC += imm;
+                    break;
+                case "BNZ":
+                    if (newRegisters[rd] !== 0) newPC += imm;
+                    break;
+                case "BLT":
+                    if (newRegisters[rd] < newRegisters[rs]) newPC += imm;
+                    break;
+                case "BGE":
+                    if (newRegisters[rd] >= newRegisters[rs]) newPC += imm;
+                    break;
+                case "BLTU":
+                    if ((newRegisters[rd] >>> 0) < (newRegisters[rs] >>> 0)) newPC += imm; // Unsigned comparison
+                    break;
+                case "BGEU":
+                    if ((newRegisters[rd] >>> 0) >= (newRegisters[rs] >>> 0)) newPC += imm; // Unsigned comparison
+                    break;
+            }
             break;
+        
+        case "LUI":
+        case "AUIPC":
+              rd = parseInt(parts[1]);
+              imm = parseInt(parts[2]);
+          
+              if (isNaN(rd) || isNaN(imm)) {
+                  console.error(`${instr} requires a register and an immediate value`);
+                  return;
+              }
+          
+              switch (instr) {
+                  case "LUI":
+                      newRegisters[rd] = imm << 12; // Load upper 20 bits
+                      break;
+                  case "AUIPC":
+                      newRegisters[rd] = (newPC + (imm << 12)) >>> 0; // Add upper immediate to PC
+                      break;
+              }
+              break;
+              
+              
         case "J":
             imm = parseInt(parts[1]);
             if (imm === null) {
