@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { JSX, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
@@ -7,7 +7,7 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import { Decoration, ViewPlugin } from "@codemirror/view";
 import { RangeSet } from "@codemirror/state";
 
-export default function Home() {
+export default function Home(): JSX.Element {
 
   const initialAssemblyCode = `# Initialize registers
     LI 0x0, 5        # Load immediate 5 into 0x0
