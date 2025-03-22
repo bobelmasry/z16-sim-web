@@ -1,4 +1,4 @@
-import { JSX, useState } from "react";
+import { useState, useEffect } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
@@ -7,7 +7,7 @@ import { oneDark } from "@codemirror/theme-one-dark";
 import { Decoration, ViewPlugin } from "@codemirror/view";
 import { RangeSet } from "@codemirror/state";
 
-export default function Home(): JSX.Element {
+export default function Home() {
 
   const initialAssemblyCode = `# Initialize registers
     LI 0x0, 5        # Load immediate 5 into 0x0
@@ -37,12 +37,14 @@ export default function Home(): JSX.Element {
     JALR 0x7         # Return to saved address in 0x7
 
     # System call
-    ECALL 0x2        # Print value in 0x2`;
+    ECALL 0x2        # Print value in 0x2
+`;
 
   const [assemblyCode, setAssemblyCode] = useState(initialAssemblyCode);
   const [registers, setRegisters] = useState(Array(8).fill(0));
   const [displayFormat, setDisplayFormat] = useState("decimal");
   const [PC, setPC] = useState(0);
+  const [consoleMessages, setConsoleMessages] = useState<string[]>([]) // Stores console output logs
 
   // Define Z16 Assembly Syntax Highlighting
 const z16Language = StreamLanguage.define({
@@ -145,8 +147,6 @@ const z16Language = StreamLanguage.define({
 
     if (PC >= lines.length) return;
 
-    console.log(`Executing instruction at PC ${PC}: ${lines[PC]}`);
-
     let newRegisters = [...registers];
     let newPC = PC;
 
@@ -174,7 +174,7 @@ const z16Language = StreamLanguage.define({
   };
 
   const parts = parseInstruction(lines[newPC]);
-  console.log(parts);
+  console.log(consoleMessages);
   if (parts.length === 0) return;
 
     const instr = parts[0].toUpperCase();
@@ -383,14 +383,16 @@ const z16Language = StreamLanguage.define({
             newRegisters[7] = newPC + 1;
             newPC += imm;
             break;
-        case "ECALL":
-            rd = parseInt(parts[1]);
-            if (rd !== null) {
-              console.log(`ECALL at PC ${newPC}: x${rd} = ${newRegisters[rd]}`);
-            } else {
-              console.error("ECALL requires a valid register index");
-            }
-            break;
+            case "ECALL":
+              rd = parseInt(parts[1]);
+              if (!isNaN(rd) && rd >= 0 && rd < newRegisters.length) {
+                  const message = `${newRegisters[rd]}`;
+                  setConsoleMessages((prev) => [...prev, message]);  // Append message to state
+              } else {
+                  setConsoleMessages((prev) => [...prev, "ECALL requires a valid register index"]);
+              }
+              break;
+          
         default:
             console.error(`Unknown instruction: ${instr}`);
             return;
@@ -399,23 +401,27 @@ const z16Language = StreamLanguage.define({
     if (!step) newPC++;
     setRegisters(newRegisters);
     setPC(newPC);
-
-    console.log("Registers:", newRegisters);
 };
 
   const Reset = () => {
     setPC(0);
     setRegisters(Array(8).fill(0));
+    setConsoleMessages([]);
   };
+
+  useEffect(() => {
+    console.log("Updated Console Messages:", consoleMessages);
+  }, [consoleMessages]);
+  
 
 
   return (
-          <div className="flex min-h-screen text-black items-start justify-center pt-12 lg:pt-40 bg-gray-800">
-        {/* Left: Assembly Code Input */}
-      <div className="w-1/2 p-4">
-        <h2 className="text-xl text-gray-200 font-bold mb-2">Z16 Assembly Simulator</h2>
-
-        <div className="w-full p-2 border rounded-lg shadow-sm focus:outline-none bg-gray-200 overflow-y-auto">
+    <div className="flex min-h-screen text-black items-start justify-center pt-8 lg:pt-20 bg-gray-800">
+    {/* Left: Assembly Code Input */}
+    <div className="w-1/2 p-4">
+      <h2 className="text-xl text-gray-200 font-bold mb-2">Z16 Assembly Simulator</h2>
+      
+      <div className="w-full p-2 border rounded-lg shadow-sm focus:outline-none bg-gray-200 overflow-y-auto">
         {/* CodeMirror Editor */}
         <CodeMirror
           value={assemblyCode}
@@ -425,60 +431,76 @@ const z16Language = StreamLanguage.define({
           className="w-full h-auto p-2 border rounded-lg shadow-sm bg-gray-200"
           style={{ backgroundColor: "#2a313d" }} // Ensures full gray background
         />
-        </div>
-        </div>
-
-      {/* Right: Register Table */}
-      <div className="w-1/3 p-4 bg-gray-200 mt-14 shadow-lg rounded-lg">
-        <h2 className="text-xl font-bold mb-2">Registers</h2>
-
-        {/* Dropdown to select display format */}
-        <div className="mb-2">
-          <label className="text-sm font-semibold">Display Format:</label>
-          <select
-            className="ml-2 p-1 border rounded-lg bg-gray-100"
-            value={displayFormat}
-            onChange={(e) => setDisplayFormat(e.target.value)}
-          >
-            <option value="decimal">Decimal</option>
-            <option value="binary">Binary</option>
-            <option value="hex">Hexadecimal</option>
-          </select>
-        </div>
-
-        {/* Register Table */}
-        <table className="w-full border-collapse border bg-gray-300 border-gray-300">
-          <thead>
-            <tr className="bg-gray-100">
-              <th className="border p-2">Register</th>
-              <th className="border p-2">Value</th>
-            </tr>
-          </thead>
-          <tbody>
+      </div>
+    </div>
+  
+    {/* Right: Register Table & Console */}
+    <div className="w-1/3 p-4 bg-gray-200 mt-14 shadow-lg rounded-lg">
+      <h2 className="text-xl font-bold mb-2">Registers</h2>
+  
+      {/* Dropdown to select display format */}
+      <div className="mb-2">
+        <label className="text-sm font-semibold">Display Format:</label>
+        <select
+          className="ml-2 p-1 border rounded-lg bg-gray-100"
+          value={displayFormat}
+          onChange={(e) => setDisplayFormat(e.target.value)}
+        >
+          <option value="decimal">Decimal</option>
+          <option value="binary">Binary</option>
+          <option value="hex">Hexadecimal</option>
+        </select>
+      </div>
+  
+      {/* Register Table */}
+      <table className="w-full border-collapse border bg-gray-300 border-gray-300">
+        <thead>
+          <tr className="bg-gray-100">
+            <th className="border p-2">Register</th>
+            <th className="border p-2">Value</th>
+          </tr>
+        </thead>
+        <tbody>
           <tr className="text-center bg-orange-200">
-              <td className="border p-2">PC</td>
-              <td className="border p-2">{formatValue(PC)}</td>
+            <td className="border p-2">PC</td>
+            <td className="border p-2">{formatValue(PC)}</td>
+          </tr>
+          {registers.map((value, index) => (
+            <tr key={index} className="text-center bg-gray-100">
+              <td className="border p-2">{`0x${index}`}</td>
+              <td className="border p-2">{formatValue(value)}</td>
             </tr>
-            {registers.map((value, index) => (
-              <tr key={index} className="text-center bg-gray-100">
-                <td className="border p-2">{`0x${index}`}</td>
-                <td className="border p-2">{formatValue(value)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {/* Buttons for Execution */}
-        <div className="mt-4 flex space-x-2">
-          <button onClick={() => executeInstructions(false)}
-          className="px-4 font-semibold py-2 bg-green-500 text-gray-200 rounded-lg shadow hover:bg-green-600">
-            Step
-          </button>
-          <button onClick={() => Reset()}
-          className="px-4 font-semibold py-2 bg-blue-500 text-gray-200 rounded-lg shadow hover:bg-blue-600">
-            Reset
-          </button>
+          ))}
+        </tbody>
+      </table>
+  
+      {/* Buttons for Execution */}
+      <div className="mt-4 flex space-x-2">
+        <button
+          onClick={() => executeInstructions(false)}
+          className="px-4 font-semibold py-2 bg-green-500 text-gray-200 rounded-lg shadow hover:bg-green-600"
+        >
+          Step
+        </button>
+        <button
+          onClick={() => Reset()}
+          className="px-4 font-semibold py-2 bg-blue-500 text-gray-200 rounded-lg shadow hover:bg-blue-600"
+        >
+          Reset
+        </button>
+      </div>
+  
+      {/* Console Window */}
+      <div className="mt-6 p-3 bg-black text-green-400 rounded-lg shadow-md h-40 overflow-y-auto text-sm font-mono">
+        <h3 className="text-gray-300 font-semibold">Console Output:</h3>
+        <div className="mt-2">
+          {consoleMessages.map((msg, index) => (
+            <div key={index} className="whitespace-pre-wrap">{msg}</div>
+          ))}
         </div>
       </div>
     </div>
+  </div>
+  
   );
 }
