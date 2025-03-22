@@ -432,10 +432,13 @@ const z16Language = StreamLanguage.define({
           style={{ backgroundColor: "#2a313d" }} // Ensures full gray background
         />
       </div>
+        <div className="mt-4">
+        <h1 className="text-gray-300 font-bold">Created by Aly Youssef based on Prof. Mohamed Shalan's <a target="_blank" className="text-blue-600" href="https://github.com/shalan/z16">Z16 ISA.</a>
+        <br></br> Code for this project can be found <a target="_blank" className="text-blue-600" href="https://github.com/bobelmasry/z16-sim-web">Here</a></h1>
+        </div>
     </div>
-  
     {/* Right: Register Table & Console */}
-    <div className="w-1/3 p-4 bg-gray-200 mt-14 shadow-lg rounded-lg">
+    <div className="w-1/3 p-4 bg-gray-200 mt-13 shadow-lg rounded-lg">
       <h2 className="text-xl font-bold mb-2">Registers</h2>
   
       {/* Dropdown to select display format */}
