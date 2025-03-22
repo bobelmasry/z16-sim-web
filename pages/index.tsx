@@ -174,7 +174,6 @@ const z16Language = StreamLanguage.define({
   };
 
   const parts = parseInstruction(lines[newPC]);
-  console.log(consoleMessages);
   if (parts.length === 0) return;
 
     const instr = parts[0].toUpperCase();
@@ -408,12 +407,6 @@ const z16Language = StreamLanguage.define({
     setRegisters(Array(8).fill(0));
     setConsoleMessages([]);
   };
-
-  useEffect(() => {
-    console.log("Updated Console Messages:", consoleMessages);
-  }, [consoleMessages]);
-  
-
 
   return (
     <div className="flex min-h-screen text-black items-start justify-center pt-8 lg:pt-20 bg-gray-800">
