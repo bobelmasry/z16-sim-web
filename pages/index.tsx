@@ -1,11 +1,18 @@
-import { useState, useEffect } from "react";
-import CodeMirror from "@uiw/react-codemirror";
+import { useState } from "react";
+import dynamic from "next/dynamic";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
 import { StreamLanguage } from "@codemirror/language";
 import { oneDark } from "@codemirror/theme-one-dark";
 import { Decoration, ViewPlugin } from "@codemirror/view";
 import { RangeSet } from "@codemirror/state";
+
+// Dynamically import CodeMirror to avoid SSR issues
+const CodeMirror = dynamic(
+  () => import("@uiw/react-codemirror").then((mod) => mod.default),
+  { ssr: false }
+);
+
 
 export default function Home() {
 
